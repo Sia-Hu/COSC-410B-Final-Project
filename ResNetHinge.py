@@ -24,8 +24,6 @@ dataset_path = '/home/xhu/COSC410/TrashType_Image_Dataset'
 
 garbage_types = os.listdir(dataset_path)
 
-all_dimensions_set = set()
-
 dat = []
 
 for garbage_type in garbage_types:
