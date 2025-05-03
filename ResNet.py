@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from PIL import Image
 from sklearn.model_selection import train_test_split
-from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from keras.layers import Input, Activation, Add, Dense, Conv2D, GlobalAveragePooling2D, MaxPooling2D
 from keras.layers import BatchNormalization, Dropout
@@ -125,10 +124,6 @@ val_generator = val_datagen.flow_from_dataframe(
 
 # Extract class labels from the 'label' column of train_df
 class_labels = train_df['label'].unique()
-# Compute class weights
-weights = compute_class_weight(class_weight='balanced', classes=class_labels, y=train_df['label'])
-# Convert the computed weights to a dictionary for passing to model training
-class_weights = dict(zip(train_generator.class_indices.values(), weights))
 
 
 def residual_block(X, kernel_size, filters, reduce=False, stride=2):
@@ -283,12 +278,9 @@ early_stopping = EarlyStopping(monitor='val_loss', mode='min', patience=50, rest
 num_epochs = 30
 
 # Train the model
-history = resnet50_model.fit(train_generator, 
-                                      steps_per_epoch=len(train_generator), 
+history = resnet50_model.fit(train_generator,
                                       epochs=num_epochs, 
-                                      validation_data=val_generator, 
-                                      validation_steps=len(val_generator),
-                                      class_weight=class_weights,
+                                      validation_data=val_generator,
                                       callbacks=[reduce_lr, early_stopping])
 
 # Save the trained model
