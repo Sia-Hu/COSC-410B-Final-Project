@@ -24,40 +24,6 @@ from sklearn.metrics import classification_report, confusion_matrix
 # Define the path where our dataset is stored
 dataset_path = '/home/ybi/COSC410/TrashType_Image_Dataset'
 
-# # Retrieve the names of all folders (representing trash types) within the dataset directory
-# garbage_types = os.listdir(dataset_path)
-
-# # Set to store unique image dimensions for the entire dataset
-# all_dimensions_set = set()
-
-# # Iterate over each trash type (folder) to process images
-# for garbage_type in garbage_types:
-#     folder_path = os.path.join(dataset_path, garbage_type)
-    
-#     # Verify that the current item is a directory
-#     if os.path.isdir(folder_path):
-#         image_files = [f for f in os.listdir(folder_path) if f.endswith(('jpg', 'jpeg'))]
-        
-#         # Display the count of images in the current folder
-#         num_images = len(image_files)
-#         print(f"{garbage_type} folder contains {num_images} images.")
-        
-#         # Loop over each image to check its dimensions
-#         for image_file in image_files:
-#             image_path = os.path.join(folder_path, image_file)
-#             with Image.open(image_path) as img:
-#                 # Extract the width, height, and channels (color depth) of the image and add to the dimensions set
-#                 width, height = img.size
-#                 channels = len(img.getbands())
-#                 all_dimensions_set.add((width, height, channels))
-                
-# # Determine if all images in the entore dataset have the same dimensions 
-# if len(all_dimensions_set) == 1: 
-#     width, height, channel = all_dimensions_set.pop()
-#     print(f"\nAll images in the dataset have the same dimensions: {width}x{height} with {channels} color channels.")
-# else:
-#     print("\nThe images in the dataset have different dimensions or color channels.")
-
 garbage_types = os.listdir(dataset_path)
 
 dat = []
@@ -68,9 +34,6 @@ for garbage_type in garbage_types:
         dat.append((os.path.join(dataset_path, garbage_type, file), garbage_type))
 
 df = pd.DataFrame(dat, columns=['filepath', 'label'])
-
-train_df, val_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df['label'])
-
 
 # Split with stratification
 train_df, val_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df['label'])
@@ -94,8 +57,6 @@ train_datagen = ImageDataGenerator(
 # Only rescaling for validation
 val_datagen = ImageDataGenerator(rescale=1./255)
 
-
-# Using flow_from_dataframe to generate batches
 # Generate training batches from the training dataframe
 train_generator = train_datagen.flow_from_dataframe(
     dataframe=train_df,                  # DataFrame containing training data
@@ -135,7 +96,6 @@ def residual_block(X, kernel_size, filters, reduce=False, stride=2):
     X_shortcut = X
     
     if reduce:
-        # if we are to reduce the spatial size, apply a 1x1 CONV layer to the shortcut path
         X = Conv2D(filters = F1, kernel_size = (1, 1), strides = (stride,stride), padding = 'valid', kernel_initializer='he_normal')(X)
         X = BatchNormalization(axis = 3)(X)
         X = Activation('relu')(X)
@@ -162,52 +122,6 @@ def residual_block(X, kernel_size, filters, reduce=False, stride=2):
     X = Activation('relu')(X)
     
     return X
-
-# def ResNet_50(input_shape, classes):
-
-#     # Define the input as a tensor with shape input_shape
-#     X_input = Input(input_shape)
-
-#     # Block 1
-#     X = Conv2D(64, (7, 7), strides=(2, 2), kernel_initializer='he_normal')(X_input)
-#     X = BatchNormalization(axis=3)(X)
-#     X = Activation('relu')(X)
-#     X = MaxPooling2D((3, 3), strides=(2, 2))(X)
-
-#     # Block 2
-#     X = residual_block(X, 3, [64, 64, 256], reduce=True, stride=1)
-#     X = residual_block(X, 3, [64, 64, 256])
-#     X = residual_block(X, 3, [64, 64, 256])
-
-#     # Block 3 
-#     X = residual_block(X, 3, [128, 128, 512], reduce=True, stride=2)  
-#     X = residual_block(X, 3, [128, 128, 512])
-#     X = residual_block(X, 3, [128, 128, 512])
-#     X = residual_block(X, 3, [128, 128, 512])
-
-#     # Block 4 
-#     X = residual_block(X, 3, [256, 256, 1024], reduce=True, stride=2)
-#     X = residual_block(X, 3, [256, 256, 1024])
-#     X = residual_block(X, 3, [256, 256, 1024])
-#     X = residual_block(X, 3, [256, 256, 1024])
-#     X = residual_block(X, 3, [256, 256, 1024])
-#     X = residual_block(X, 3, [256, 256, 1024])
-
-#     # Block 5 
-#     X = residual_block(X, 3, [512, 512, 2048], reduce=True, stride=2)
-#     X = residual_block(X, 3, [512, 512, 2048])
-#     X = residual_block(X, 3, [512, 512, 2048])
-
-#     # Global Average Pooling to reduce spatial dimensions
-#     X = GlobalAveragePooling2D()(X)
-    
-#     # Fully Connected Layer for classification
-#     X = Dense(classes, activation='softmax')(X)
-        
-#     # Create the model
-#     model = Model(inputs = X_input, outputs = X, name='ResNet50')
-
-#     return model
 
 def Modified_ResNet50(input_shape, classes):
 
@@ -275,7 +189,7 @@ early_stopping = EarlyStopping(monitor='val_loss', mode='min', patience=50, rest
 
 
 # Total number of epochs
-num_epochs = 30
+num_epochs = 200
 
 # Train the model
 history = resnet50_model.fit(train_generator,
@@ -284,15 +198,12 @@ history = resnet50_model.fit(train_generator,
                                       callbacks=[reduce_lr, early_stopping])
 
 # Save the trained model
-resnet50_model.save("resnet50_model_from_scratch.h5")
+resnet50_model.save("resnet50_model.h5")
 
 def evaluate_model_performance(model, val_generator, class_labels):
     
     # Getting all the true labels for the validation set
     true_labels = val_generator.classes
-
-    # Get the class labels (names) from the generator
-    class_labels = list(val_generator.class_indices.keys())
 
     # To get the predicted labels, we predict using the model  
     predictions = model.predict(val_generator, steps=len(val_generator))
