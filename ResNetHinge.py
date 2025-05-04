@@ -12,7 +12,8 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from keras.layers import Input, Activation, Add, Dense, Conv2D, GlobalAveragePooling2D, MaxPooling2D
 from keras.layers import BatchNormalization, Dropout
-from tensorflow.keras.regularizers import l2
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.optimizers import Adam
 from keras.callbacks import ReduceLROnPlateau, EarlyStopping
 from keras.models import Model
@@ -20,7 +21,8 @@ from keras.utils import plot_model
 from sklearn.metrics import classification_report, confusion_matrix
 
 
-dataset_path = '/home/xhu/COSC410/TrashType_Image_Dataset'
+# Define the path where our dataset is stored
+dataset_path = '/home/ybi/COSC410/TrashType_Image_Dataset'
 
 garbage_types = os.listdir(dataset_path)
 
@@ -33,6 +35,7 @@ for garbage_type in garbage_types:
 
 df = pd.DataFrame(dat, columns=['filepath', 'label'])
 
+# Split with stratification
 train_df, val_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df['label'])
 
 
@@ -54,8 +57,6 @@ train_datagen = ImageDataGenerator(
 # Only rescaling for validation
 val_datagen = ImageDataGenerator(rescale=1./255)
 
-
-# Using flow_from_dataframe to generate batches
 # Generate training batches from the training dataframe
 train_generator = train_datagen.flow_from_dataframe(
     dataframe=train_df,                  # DataFrame containing training data
@@ -82,24 +83,11 @@ val_generator = val_datagen.flow_from_dataframe(
 )
 
 
+# Extract class labels from the 'label' column of train_df
 class_labels = train_df['label'].unique()
 
 
 def residual_block(X, kernel_size, filters, reduce=False, stride=2):
-    """
-    Implement a residual block for ResNet architectures.
-    
-    Arguments:
-    X           -- input tensor of shape (m, height, width, channels)
-    kernel_size -- integer, kernel size of the middle convolutional layer in the main path
-    filters     -- python list of integers, defining the number of filters in the CONV layers of the main path
-    reduce      -- boolean, whether to reduce the spatial dimensions and increase depth; 
-                    if True, applies 1x1 CONV layer to the shortcut path.
-    stride      -- integer, strides for the convolutional layer
-    
-    Returns:
-    X           -- output of the identity block, tensor of shape (height, width, channels)
-    """
     
     # Retrieve Filters
     F1, F2, F3 = filters
@@ -108,7 +96,6 @@ def residual_block(X, kernel_size, filters, reduce=False, stride=2):
     X_shortcut = X
     
     if reduce:
-        # if we are to reduce the spatial size, apply a 1x1 CONV layer to the shortcut path
         X = Conv2D(filters = F1, kernel_size = (1, 1), strides = (stride,stride), padding = 'valid', kernel_initializer='he_normal')(X)
         X = BatchNormalization(axis = 3)(X)
         X = Activation('relu')(X)
@@ -203,26 +190,21 @@ early_stopping = EarlyStopping(monitor='val_loss', mode='min', patience=50, rest
 
 
 # Total number of epochs
-num_epochs = 30
+num_epochs = 200
 
 # Train the model
-history = Hinge_resnet50_model.fit(train_generator, 
-                                      steps_per_epoch=len(train_generator), 
+history = Hinge_resnet50_model.fit(train_generator,
                                       epochs=num_epochs, 
-                                      validation_data=val_generator, 
-                                      validation_steps=len(val_generator),
+                                      validation_data=val_generator,
                                       callbacks=[reduce_lr, early_stopping])
 
 
-Hinge_resnet50_model.save("resnet50_model_Hinge.h5")
+Hinge_resnet50_model.save("resnet50_Hinge.h5")
 
 def evaluate_model_performance(model, val_generator, class_labels):
     
     # Getting all the true labels for the validation set
     true_labels = val_generator.classes
-
-    # Get the class labels (names) from the generator
-    class_labels = list(val_generator.class_indices.keys())
 
     # To get the predicted labels, we predict using the model  
     predictions = model.predict(val_generator, steps=len(val_generator))
@@ -252,6 +234,6 @@ def evaluate_model_performance(model, val_generator, class_labels):
     plt.ylabel('True Labels')
     plt.title('Confusion Matrix')
     plt.show()
-    plt.savefig("scratch_confusion_matrix.png", bbox_inches='tight', dpi=300)
+    plt.savefig("resnet50_Hinge_confusion_matrix.png", bbox_inches='tight', dpi=300)
 
 evaluate_model_performance(Hinge_resnet50_model, val_generator, class_labels)
