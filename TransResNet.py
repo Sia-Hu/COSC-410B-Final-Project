@@ -3,6 +3,17 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications.resnet50 import preprocess_input
+import tensorflow as tf
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+from tensorflow.keras.models import load_model
 
 dataset_path = '/home/xhu/COSC410/TrashType_Image_Dataset'
 garbage_types = [d for d in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, d))]
@@ -55,13 +66,6 @@ test_generator = test_datagen.flow_from_dataframe(
     shuffle=False
 )
 
-import tensorflow as tf
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
-
 num_classes = len(train_generator_aug.class_indices)
 
 base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(384, 384, 3))
@@ -70,12 +74,9 @@ base_model.trainable = True
 for layer in base_model.layers[:-30]:  # freeze all but last 30 layers
     layer.trainable = False
 
-# Add custom classification head
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
 x = Dropout(0.5)(x)
-x = Dense(256, activation='relu')(x)
-x = Dropout(0.3)(x)
 predictions = Dense(num_classes, activation='softmax')(x)
 
 # Final model
@@ -96,31 +97,42 @@ history = model.fit(train_generator_aug,
                     validation_data=test_generator,
                     callbacks=[reduce_lr, early_stopping])
 
-model.save('trash_classification_model_0414.h5')
+model.save('trans_ResNet50.h5')
 
-from sklearn.metrics import classification_report, confusion_matrix
-import seaborn as sns
-import matplotlib.pyplot as plt
-import numpy as np
-from tensorflow.keras.models import load_model
+def evaluate_model_performance(model, val_generator, class_labels):
+    
+    # Getting all the true labels for the validation set
+    true_labels = val_generator.classes
 
-loss, accuracy = model.evaluate(test_generator, verbose=1)
-print(f"Test Accuracy: {accuracy * 100:.2f}%")
+    # To get the predicted labels, we predict using the model  
+    predictions = model.predict(val_generator, steps=len(val_generator))
+    
+    # Take the argmax to get the predicted class indices.
+    predicted_labels = np.argmax(predictions, axis=1)
+    
+    # Extracting true labels from the validation generator
+    true_labels = val_generator.classes
 
-true_labels = test_generator.classes
-class_labels = list(test_generator.class_indices.keys())
-predictions = model.predict(test_generator, steps=len(test_generator))
-predicted_labels = np.argmax(predictions, axis=1)
-report = classification_report(true_labels, predicted_labels, target_names=class_labels)
-print("\nClassification Report:\n", report)
+    # Classification report
+    report = classification_report(true_labels, predicted_labels, target_names=class_labels)
+    print(report)
+    print('\n')
+    
+    # Define a custom colormap
+    colors = ["white", "royalblue"]
+    cmap_cm = LinearSegmentedColormap.from_list("cmap_cm", colors)
 
-cm = confusion_matrix(true_labels, predicted_labels)
+    # Confusion Matrix
+    cm = confusion_matrix(true_labels, predicted_labels)
 
-plt.figure(figsize=(10, 8))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
-plt.xlabel("Predicted Label")
-plt.ylabel("True Label")
-plt.title("Confusion Matrix")
-plt.show()
+    # Plotting confusion matrix using seaborn
+    plt.figure(figsize=(8,6))
+    sns.heatmap(cm, annot=True, cmap=cmap_cm, fmt='d', xticklabels=class_labels, yticklabels=class_labels)
+    plt.xlabel('Predicted Labels')
+    plt.ylabel('True Labels')
+    plt.title('Confusion Matrix')
+    plt.show()
+    plt.savefig("resnet50_confusion_matrix.png", bbox_inches='tight', dpi=300)
 
-plt.savefig("trans_confusion_matrix.png", bbox_inches='tight', dpi=300)
+class_labels = train_set['label'].unique()
+evaluate_model_performance(model, test_generator, class_labels)
