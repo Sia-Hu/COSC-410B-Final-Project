@@ -233,6 +233,6 @@ def evaluate_model_performance(model, val_generator, class_labels):
     plt.ylabel('True Labels')
     plt.title('Confusion Matrix')
     plt.show()
-    plt.savefig("scratch_confusion_matrix.png", bbox_inches='tight', dpi=300)
+    plt.savefig("resnet50_confusion_matrix.png", bbox_inches='tight', dpi=300)
 
 evaluate_model_performance(resnet50_model, val_generator, class_labels)
